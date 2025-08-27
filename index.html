@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Combos de Carnicería</title>
+  <script src="script.js" defer></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white text-gray-900">
+
+  <!-- Header con imagen -->
+  <header class="flex justify-center mt-4">
+    <img src="https://i.imgur.com/YbENHcg.png" alt="Header" class="w-80 sm:w-96">
+  </header>
+
+  <!-- Contenedor de combos -->
+  <main id="combos-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-4 pb-40 max-w-6xl mx-auto"></main>
+
+  <!-- Botón flotante con contador -->
+  <button id="ver-carrito" class="fixed bottom-4 right-4 bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 z-50">
+    🛒 <span id="contador-carrito" class="bg-white text-red-700 font-bold rounded-full px-2 py-0.5 text-sm">0</span>
+    Ver Carrito
+  </button>
+
+  <!-- Total fijo abajo -->
+  <section class="fixed bottom-0 w-full bg-white border-t border-gray-300 py-2 px-4 flex justify-between items-center z-40">
+    <span class="font-bold">🛒 Total: $<span id="total">0</span></span>
+  </section>
+
+  <!-- Modal del carrito -->
+  <div id="modal-carrito" class="fixed inset-0 bg-black/50 hidden z-50 flex justify-center items-center">
+    <div class="bg-white w-full max-w-lg p-6 rounded shadow-lg max-h-[90vh] overflow-y-auto">
+      <h2 class="text-xl font-bold mb-4">Tu carrito</h2>
+      <div id="lista-carrito" class="mb-4"></div>
+      <input type="text" id="nombre" placeholder="Tu nombre" class="w-full border rounded p-2 mb-2" />
+      <input type="text" id="entrega" placeholder="Dirección de entrega" class="w-full border rounded p-2 mb-2" />
+      <div class="mb-2">
+        <label class="mr-2"><input type="radio" name="pago" value="Efectivo"> Efectivo</label>
+        <label><input type="radio" name="pago" value="MercadoPago"> MercadoPago</label>
+      </div>
+      <div class="flex justify-between mt-4">
+        <button id="cancelar" class="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded">Cancelar</button>
+        <button id="enviar-whatsapp" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Enviar pedido</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
