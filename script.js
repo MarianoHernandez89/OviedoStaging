@@ -205,10 +205,21 @@ enviarPedidoBtn.addEventListener('click', () => {
 // ARMAR COMBO PERSONALIZADO
 // =============================
 
-// Crear card “Armá tu combo”
+// Crear card “Armá tu propio combo”
 const cardArmarCombo = document.createElement('div');
 cardArmarCombo.className = 'rounded-lg overflow-hidden shadow-lg bg-white flex flex-col cursor-pointer border border-dashed border-gray-400 hover:border-red-700 justify-center items-center p-4 text-center';
-cardArmarCombo.innerHTML = `<p class="font-bold text-lg text-gray-700">Armá tu combo</p>`;
+cardArmarCombo.style.backgroundImage = "url('https://i.imgur.com/1ZCGoNL.jpeg')"; // reemplazá con la URL de la imagen que quieras
+cardArmarCombo.style.backgroundSize = 'cover';
+cardArmarCombo.style.backgroundPosition = 'center';
+cardArmarCombo.style.height = '200px'; // altura fija para que se vea bien
+
+cardArmarCombo.innerHTML = `
+  <div class="flex justify-center items-center w-full h-full bg-black/40 rounded">
+    <p class="font-bold text-lg text-white">Armá tu propio combo</p>
+  </div>
+`;
+
+// Agregar al final del contenedor
 combosContainer.appendChild(cardArmarCombo);
 
 // Modal y referencias
