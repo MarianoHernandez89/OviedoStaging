@@ -1,12 +1,12 @@
-// Tu JavaScript actualizado con mejoras visuales y contador de productos en el carrito
-
+// Configuración Google Sheets
 const SHEET_ID = '1YUK837KaCVRFGvSoBG5y0AANIAaFtD6ea00ikSrqR-o';
 const SHEET_NAME = 'Combos';
 const URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
 
+// Referencias DOM
 const combosContainer = document.getElementById('combos-container');
 const totalSpan = document.getElementById('total');
-const modal = document.getElementById('modal-carrito');
+const modalCarrito = document.getElementById('modal-carrito');
 const modalContent = document.getElementById('lista-carrito');
 const nombreInput = document.getElementById('nombre');
 const entregaInput = document.getElementById('entrega');
@@ -15,59 +15,57 @@ const enviarPedidoBtn = document.getElementById('enviar-whatsapp');
 const cerrarModalBtn = document.getElementById('cancelar');
 const contadorCarrito = document.getElementById('contador-carrito');
 
+// Modal de detalle combo
+const modalCombo = document.getElementById('modal-combo');
+const comboNombre = document.getElementById('combo-nombre');
+const comboProductos = document.getElementById('combo-productos');
+const comboPrecio = document.getElementById('combo-precio');
+const btnAgregarCombo = document.getElementById('agregar-combo');
+const cerrarModalCombo = document.getElementById('cerrar-modal-combo');
+
 let carrito = JSON.parse(localStorage.getItem('carrito')) || [];
 let combosData = [];
+let comboSeleccionado = null;
 
+// Cargar combos
 fetch(URL)
   .then(res => res.json())
   .then(data => {
     combosData = data;
     data.forEach(combo => {
       const card = document.createElement('div');
-      card.className = 'rounded-lg overflow-hidden shadow-lg bg-white flex flex-col';
+      card.className = 'rounded-lg overflow-hidden shadow-lg bg-white flex flex-col cursor-pointer';
 
       const imagenUrl = combo.Imagen || combo.imagen || '';
       const nombre = (combo.Nombre || combo.nombre || 'Sin nombre').toUpperCase();
       const productos = combo.Productos || combo.productos || '';
       const precio = parseFloat(combo.Precio || combo.precio || 0);
 
-      card.style.backgroundImage = `url('${imagenUrl}')`;
-      card.style.backgroundSize = 'cover';
-      card.style.backgroundPosition = 'center';
-
       card.innerHTML = `
         <div class="relative h-60 bg-cover bg-center rounded-t-lg" style="background-image: url('${imagenUrl}')">
           <div class="absolute top-0 w-full bg-black/70 text-white text-center py-2 z-20">
             <h2 class="text-lg md:text-xl font-bold uppercase px-2 truncate">${nombre}</h2>
           </div>
-          <div class="absolute inset-0 flex items-center justify-center px-4">
-            <div class="bg-black/60 rounded p-2 w-full text-center space-y-1 max-h-[70%] overflow-y-auto mt-8 pt-4">
-              ${productos
-                .split(',')
-                .map(prod => `<p class="text-white text-sm md:text-base font-bold uppercase tracking-wide">${prod.trim()}</p>`)
-                .join('')}
-            </div>
-          </div>
         </div>
         <div class="bg-white px-4 py-2 flex flex-row justify-between items-center">
           <p class="text-base font-bold text-red-700">$${precio.toLocaleString('es-AR')}</p>
-          <button class="bg-red-700 hover:bg-red-800 text-white text-sm px-3 py-1 rounded add-to-cart">
-            Agregar al carrito
+          <button class="bg-red-700 hover:bg-red-800 text-white text-sm px-3 py-1 rounded ver-detalle">
+            Ver detalle
           </button>
         </div>
       `;
 
-      const boton = card.querySelector('.add-to-cart');
-      boton.addEventListener('click', () => {
-        carrito.push({ nombre, precio, productos });
-        localStorage.setItem('carrito', JSON.stringify(carrito));
-        actualizarTotal();
-
-        // Animación del botón
-        boton.classList.add('scale-110', 'transition', 'duration-150');
-        setTimeout(() => {
-          boton.classList.remove('scale-110');
-        }, 150);
+      // Evento ver detalle
+      const botonDetalle = card.querySelector('.ver-detalle');
+      botonDetalle.addEventListener('click', () => {
+        comboSeleccionado = { nombre, precio, productos };
+        comboNombre.textContent = nombre;
+        comboProductos.innerHTML = productos
+          .split(',')
+          .map(p => `<li>${p.trim()}</li>`)
+          .join('');
+        comboPrecio.textContent = `$${precio.toLocaleString('es-AR')}`;
+        modalCombo.classList.remove('hidden');
       });
 
       combosContainer.appendChild(card);
@@ -75,14 +73,12 @@ fetch(URL)
 
     actualizarTotal();
   })
-  .catch(error => {
-    console.error('Error al cargar los datos:', error);
-  });
+  .catch(error => console.error('Error al cargar los datos:', error));
 
+// Funciones carrito
 function actualizarTotal() {
   const total = carrito.reduce((sum, item) => sum + item.precio, 0);
   totalSpan.textContent = total.toLocaleString('es-AR');
-
   const cantidad = carrito.length;
   if (cantidad > 0) {
     contadorCarrito.textContent = cantidad;
@@ -134,70 +130,61 @@ function renderizarCarrito() {
 function cambiarCantidad(nombre, productos, cambio) {
   const index = carrito.findIndex(item => item.nombre === nombre && item.productos === productos);
   if (index !== -1) {
-    if (cambio === -1) {
-      carrito.splice(index, 1);
-    } else if (cambio === 1) {
-      carrito.push({ nombre, productos, precio: carrito[index].precio });
-    }
+    if (cambio === -1) carrito.splice(index, 1);
+    else if (cambio === 1) carrito.push({ nombre, productos, precio: carrito[index].precio });
     localStorage.setItem('carrito', JSON.stringify(carrito));
     actualizarTotal();
     renderizarCarrito();
   }
 }
 
+// Eventos
 document.getElementById('ver-carrito').addEventListener('click', () => {
   if (carrito.length === 0) {
     alert('El carrito está vacío.');
     return;
   }
   renderizarCarrito();
-  modal.classList.remove('hidden');
+  modalCarrito.classList.remove('hidden');
 });
 
-cerrarModalBtn.addEventListener('click', () => {
-  modal.classList.add('hidden');
-});
+cerrarModalBtn.addEventListener('click', () => modalCarrito.classList.add('hidden'));
 
 enviarPedidoBtn.addEventListener('click', () => {
-  if (carrito.length === 0) {
-    alert('El carrito está vacío.');
-    return;
-  }
+  if (carrito.length === 0) return alert('El carrito está vacío.');
 
   const nombre = nombreInput.value.trim();
   const entrega = entregaInput.value.trim();
   const metodoPago = Array.from(metodoPagoInputs).find(r => r.checked)?.value;
+  if (!nombre || !entrega || !metodoPago) return alert('Por favor, completá todos los campos.');
 
-  if (!nombre || !entrega || !metodoPago) {
-    alert('Por favor, completá todos los campos.');
-    return;
-  }
-
-  let mensaje = `*Pedido de Combos de Carnicería*\n\n`;
-  mensaje += `*Cliente:* ${nombre}\n`;
-  mensaje += `*Entrega:* ${entrega}\n`;
-  mensaje += `*Método de pago:* ${metodoPago}\n\n`;
-
+  let mensaje = `*Pedido de Combos de Carnicería*\n\nCliente: ${nombre}\nEntrega: ${entrega}\nMétodo de pago: ${metodoPago}\n\n`;
   const agrupado = agruparCarrito(carrito);
   agrupado.forEach(item => {
     mensaje += `*${item.nombre}* x${item.cantidad} - $${(item.precio * item.cantidad).toLocaleString('es-AR')}\n`;
-    const productos = item.productos.split(',').map(p => p.trim());
-    productos.forEach(prod => mensaje += `  - ${prod}\n`);
+    item.productos.split(',').forEach(prod => mensaje += `  - ${prod.trim()}\n`);
     mensaje += `\n`;
   });
-
-  const total = carrito.reduce((sum, item) => sum + item.precio, 0);
-  mensaje += `*Total:* $${total.toLocaleString('es-AR')}`;
+  mensaje += `*Total:* $${carrito.reduce((sum, i) => sum + i.precio, 0).toLocaleString('es-AR')}`;
 
   const numeroWhatsApp = '5492213074708';
-  const url = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensaje)}`;
-  window.open(url, '_blank');
+  window.open(`https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensaje)}`, '_blank');
 
   carrito = [];
   localStorage.removeItem('carrito');
   actualizarTotal();
-  modal.classList.add('hidden');
+  modalCarrito.classList.add('hidden');
   nombreInput.value = '';
   entregaInput.value = '';
   metodoPagoInputs.forEach(r => r.checked = false);
+});
+
+// Modal detalle combo
+cerrarModalCombo.addEventListener('click', () => modalCombo.classList.add('hidden'));
+btnAgregarCombo.addEventListener('click', () => {
+  if (!comboSeleccionado) return;
+  carrito.push(comboSeleccionado);
+  localStorage.setItem('carrito', JSON.stringify(carrito));
+  actualizarTotal();
+  modalCombo.classList.add('hidden');
 });
