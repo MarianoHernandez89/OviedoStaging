@@ -218,37 +218,60 @@ function abrirModalArmarCombo() {
 
       data.forEach(prod => {
         const div = document.createElement('div');
-        div.className = 'flex justify-between items-center border-b py-2 gap-4';
+        div.className = 'flex justify-between items-center border-b py-2 gap-2';
 
         const nombreSpan = document.createElement('span');
         nombreSpan.className = 'text-gray-700 flex-1';
         nombreSpan.textContent = `${prod.Producto} ($${parseFloat(prod.Precio).toLocaleString('es-AR')}/kg)`;
 
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.min = 0;
-        input.step = 0.5;
-        input.value = 0;
-        input.className = 'w-16 border rounded p-1 producto-cantidad';
-        input.dataset.precio = prod.Precio;
-        input.dataset.nombre = prod.Producto;
+        const controlesDiv = document.createElement('div');
+        controlesDiv.className = 'flex items-center gap-1';
+
+        const botonMenos = document.createElement('button');
+        botonMenos.textContent = '−';
+        botonMenos.className = 'bg-gray-200 px-2 rounded text-lg';
+        
+        const cantidadInput = document.createElement('span');
+        cantidadInput.textContent = '0';
+        cantidadInput.className = 'w-12 text-center';
+
+        const botonMas = document.createElement('button');
+        botonMas.textContent = '+';
+        botonMas.className = 'bg-gray-200 px-2 rounded text-lg';
 
         const unidadSpan = document.createElement('span');
         unidadSpan.textContent = 'kg';
-        unidadSpan.className = 'text-gray-700 ml-1 w-6';
+        unidadSpan.className = 'ml-1 w-6';
 
         const totalSpan = document.createElement('span');
         totalSpan.className = 'font-bold text-red-700 w-24 text-right';
         totalSpan.textContent = '$0';
 
-        input.addEventListener('input', () => {
-          const cantidad = parseFloat(input.value) || 0;
-          totalSpan.textContent = `$${(cantidad * parseFloat(input.dataset.precio)).toLocaleString('es-AR')}`;
+        let cantidad = 0;
+
+        function actualizarTotal() {
+          totalSpan.textContent = `$${(cantidad * parseFloat(prod.Precio)).toLocaleString('es-AR')}`;
           actualizarTotalModal();
+        }
+
+        botonMas.addEventListener('click', () => {
+          cantidad = parseFloat((cantidad + 0.5).toFixed(2));
+          cantidadInput.textContent = cantidad;
+          actualizarTotal();
         });
 
+        botonMenos.addEventListener('click', () => {
+          cantidad = parseFloat((Math.max(0, cantidad - 0.5)).toFixed(2));
+          cantidadInput.textContent = cantidad;
+          actualizarTotal();
+        });
+
+        controlesDiv.appendChild(botonMenos);
+        controlesDiv.appendChild(cantidadInput);
+        controlesDiv.appendChild(botonMas);
+
         div.appendChild(nombreSpan);
-        div.appendChild(input);
+        div.appendChild(controlesDiv);
         div.appendChild(unidadSpan);
         div.appendChild(totalSpan);
 
@@ -266,10 +289,14 @@ function abrirModalArmarCombo() {
 }
 
 function actualizarTotalModal() {
-  const inputs = listaProductos.querySelectorAll('.producto-cantidad');
+  const renglones = listaProductos.querySelectorAll('div.flex.justify-between.items-center');
   let total = 0;
-  inputs.forEach(input => {
-    total += (parseFloat(input.value) || 0) * parseFloat(input.dataset.precio);
+  renglones.forEach(div => {
+    const totalSpan = div.querySelector('span.font-bold.text-red-700');
+    if (totalSpan) {
+      const valor = parseFloat(totalSpan.textContent.replace(/\$|,/g, '')) || 0;
+      total += valor;
+    }
   });
   const totalDiv = document.getElementById('total-general-combo');
   if (totalDiv) totalDiv.textContent = `Total: $${total.toLocaleString('es-AR')}`;
