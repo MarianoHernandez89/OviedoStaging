@@ -1,580 +1,263 @@
-// =============================
-// CONFIGURACIÓN
-// =============================
-const SHEET_ID = '1YUK837KaCVRFGvSoBG5y0AANIAaFtD6ea00ikSrqR-o';
-const SHEET_NAME = 'Combos';
-const URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
+// ============================= CONFIGURACIÓN =============================
+const SHEET_ID = "TU_SHEET_ID";
+const SHEET_NAME_COMBOS = "Combos";
+const SHEET_NAME_PRODUCTOS = "Productos";
+const URL_COMBOS = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME_COMBOS}`;
+const URL_PRODUCTOS = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME_PRODUCTOS}`;
 
-const combosContainer = document.getElementById('combos-container');
-const totalSpan = document.getElementById('total');
-const modal = document.getElementById('modal-carrito');
-const modalContent = document.getElementById('lista-carrito');
-const nombreInput = document.getElementById('nombre');
-const entregaInput = document.getElementById('entrega');
-const metodoPagoInputs = document.getElementsByName('pago');
-const enviarPedidoBtn = document.getElementById('enviar-whatsapp');
-const cerrarModalBtn = document.getElementById('cancelar');
-const contadorCarrito = document.getElementById('contador-carrito');
+const combosContainer = document.getElementById("combos-container");
+const contadorCarrito = document.getElementById("contador-carrito");
+const totalCarritoEl = document.getElementById("total");
+const listaCarrito = document.getElementById("lista-carrito");
 
-let carrito = JSON.parse(localStorage.getItem('carrito')) || [];
-let combosData = [];
+const modalCarrito = document.getElementById("modal-carrito");
+const btnVerCarrito = document.getElementById("ver-carrito");
+const btnCancelar = document.getElementById("cancelar");
+const btnEnviarWhatsapp = document.getElementById("enviar-whatsapp");
 
-// =============================
-// CARGA DE COMBOS PREDEFINIDOS
-// =============================
-fetch(URL)
-  .then(res => res.json())
-  .then(data => {
-    combosData = data;
+const modalArmarCombo = document.getElementById("modal-armar-combo");
+const listaProductos = document.getElementById("lista-productos");
+const btnCancelarCombo = document.getElementById("cancelar-combo");
+const btnAgregarCombo = document.getElementById("agregar-combo-carrito");
 
-    data.forEach(combo => {
-      const card = document.createElement('div');
-      card.className = 'rounded-lg overflow-hidden shadow-lg bg-white flex flex-col';
+// Estado
+let carrito = [];
+let productosDisponibles = [];
 
-      const imagenUrl = combo.Imagen || combo.imagen || '';
-      const nombre = (combo.Nombre || combo.nombre || 'Sin nombre').toUpperCase();
-      const productos = combo.Productos || combo.productos || '';
-      const precio = parseFloat(combo.Precio || combo.precio || 0);
+// ============================= CARGA DE COMBOS =============================
+async function cargarCombos() {
+  const res = await fetch(URL_COMBOS);
+  const combos = await res.json();
 
-      card.style.backgroundImage = `url('${imagenUrl}')`;
-      card.style.backgroundSize = 'cover';
-      card.style.backgroundPosition = 'center';
+  combos.forEach((combo) => {
+    const card = document.createElement("div");
+    card.className =
+      "relative rounded-xl shadow-lg overflow-hidden bg-cover bg-center flex flex-col";
+    card.style.backgroundImage = `url(${combo.Imagen})`;
 
-      card.innerHTML = `
-        <div class="relative h-60 bg-cover bg-center rounded-t-lg" style="background-image: url('${imagenUrl}')">
-          <div class="absolute top-0 w-full bg-black/70 text-white text-center py-2 z-20">
-            <h2 class="text-lg md:text-xl font-bold uppercase px-2 truncate">${nombre}</h2>
-          </div>
-          <div class="absolute inset-0 flex items-center justify-center px-4">
-            <div class="bg-black/60 rounded p-2 w-full text-center space-y-1 max-h-[70%] overflow-y-auto mt-8 pt-4">
-              ${productos
-                .split(',')
-                .map(prod => `<p class="text-white text-sm md:text-base font-bold uppercase tracking-wide">${prod.trim()}</p>`)
-                .join('')}
-            </div>
-          </div>
-        </div>
-        <div class="bg-white px-4 py-2 flex flex-row justify-between items-center">
-          <p class="text-base font-bold text-red-700">$${precio.toLocaleString('es-AR')}</p>
-          <button class="bg-red-700 hover:bg-red-800 text-white text-sm px-3 py-1 rounded add-to-cart">
-            Agregar al carrito
-          </button>
-        </div>
-      `;
-
-      const boton = card.querySelector('.add-to-cart');
-      boton.addEventListener('click', () => {
-        carrito.push({ nombre, precio, productos });
-        localStorage.setItem('carrito', JSON.stringify(carrito));
-        actualizarTotal();
-
-        boton.classList.add('scale-110', 'transition', 'duration-150');
-        setTimeout(() => boton.classList.remove('scale-110'), 150);
-      });
-
-      combosContainer.appendChild(card);
-    });
-
-    // Al final, agregar card de "Armá tu propio combo"
-    crearCardArmarCombo();
-
-    actualizarTotal();
-  })
-  .catch(error => console.error('Error al cargar los datos:', error));
-
-// =============================
-// FUNCIONES CARRO
-// =============================
-function actualizarTotal() {
-  const total = carrito.reduce((sum, item) => sum + item.precio, 0);
-  totalSpan.textContent = total.toLocaleString('es-AR');
-
-  const cantidad = carrito.length;
-  if (cantidad > 0) {
-    contadorCarrito.textContent = cantidad;
-    contadorCarrito.classList.remove('hidden');
-  } else {
-    contadorCarrito.classList.add('hidden');
-  }
-}
-
-function agruparCarrito(carrito) {
-  const agrupado = [];
-  carrito.forEach(item => {
-    const existente = agrupado.find(el => el.nombre === item.nombre && el.productos === item.productos);
-    if (existente) existente.cantidad += 1;
-    else agrupado.push({ ...item, cantidad: 1 });
-  });
-  return agrupado;
-}
-
-function renderizarCarrito() {
-  modalContent.innerHTML = '';
-  const carritoAgrupado = agruparCarrito(carrito);
-
-  carritoAgrupado.forEach(item => {
-    const div = document.createElement('div');
-    div.className = 'mb-4 border-b pb-2';
-    const productosHTML = item.productos.split(',').map(prod => `<li>${prod.trim()}</li>`).join('');
-    div.innerHTML = `
-      <div class="flex justify-between items-start">
+    card.innerHTML = `
+      <div class="bg-black/50 p-4 flex flex-col flex-grow justify-between">
         <div>
-          <p class="font-bold">${item.nombre}</p>
-          <p class="text-sm text-gray-700">Cantidad: ${item.cantidad}</p>
-          <ul class="text-sm list-disc list-inside">${productosHTML}</ul>
-          <p class="text-red-600 font-medium">$${(item.precio * item.cantidad).toLocaleString('es-AR')}</p>
-          <div class="mt-2 space-x-2">
-            <button class="bg-gray-200 px-2 rounded" onclick="cambiarCantidad('${item.nombre}', '${item.productos}', -1)">−</button>
-            <button class="bg-gray-200 px-2 rounded" onclick="cambiarCantidad('${item.nombre}', '${item.productos}', 1)">+</button>
-          </div>
+          <h2 class="text-xl font-bold text-white mb-2">${combo.Nombre}</h2>
+          <p class="text-sm text-gray-200 mb-2">${combo.Productos}</p>
+        </div>
+        <div>
+          <p class="text-lg font-bold text-white mb-2">$${combo.Precio}</p>
+          <button class="agregar bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded">
+            Agregar
+          </button>
         </div>
       </div>
     `;
-    modalContent.appendChild(div);
-  });
-}
 
-function cambiarCantidad(nombre, productos, cambio) {
-  const index = carrito.findIndex(item => item.nombre === nombre && item.productos === productos);
-  if (index !== -1) {
-    if (cambio === -1) carrito.splice(index, 1);
-    else if (cambio === 1) carrito.push({ nombre, productos, precio: carrito[index].precio });
-    localStorage.setItem('carrito', JSON.stringify(carrito));
-    actualizarTotal();
-    renderizarCarrito();
-  }
-}
-
-document.getElementById('ver-carrito').addEventListener('click', () => {
-  if (carrito.length === 0) { alert('El carrito está vacío.'); return; }
-  renderizarCarrito();
-  modal.classList.remove('hidden');
-});
-
-cerrarModalBtn.addEventListener('click', () => modal.classList.add('hidden'));
-
-enviarPedidoBtn.addEventListener('click', () => {
-  if (carrito.length === 0) { alert('El carrito está vacío.'); return; }
-
-  const nombre = nombreInput.value.trim();
-  const entrega = entregaInput.value.trim();
-  const metodoPago = Array.from(metodoPagoInputs).find(r => r.checked)?.value;
-
-  if (!nombre || !entrega || !metodoPago) { alert('Por favor, completá todos los campos.'); return; }
-
-  let mensaje = `*Pedido de Combos de Carnicería*\n\n*Cliente:* ${nombre}\n*Entrega:* ${entrega}\n*Método de pago:* ${metodoPago}\n\n`;
-  const agrupado = agruparCarrito(carrito);
-  agrupado.forEach(item => {
-    mensaje += `*${item.nombre}* x${item.cantidad} - $${(item.precio * item.cantidad).toLocaleString('es-AR')}\n`;
-    item.productos.split(',').forEach(prod => mensaje += `  - ${prod.trim()}\n`);
-    mensaje += `\n`;
-  });
-  mensaje += `*Total:* $${carrito.reduce((sum, item) => sum + item.precio, 0).toLocaleString('es-AR')}`;
-
-  const numeroWhatsApp = '5492213074708';
-  window.open(`https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensaje)}`, '_blank');
-
-  carrito = [];
-  localStorage.removeItem('carrito');
-  actualizarTotal();
-  modal.classList.add('hidden');
-  nombreInput.value = '';
-  entregaInput.value = '';
-  metodoPagoInputs.forEach(r => r.checked = false);
-});
-
-// =============================
-// ARMAR TU PROPIO COMBO
-// =============================
-const modalArmarCombo = document.getElementById('modal-armar-combo');
-const listaProductos = document.getElementById('lista-productos');
-const btnCancelarCombo = document.getElementById('cancelar-combo');
-const btnAgregarCombo = document.getElementById('agregar-combo-carrito');
-let productosData = [];
-
-function crearCardArmarCombo() {
-  const card = document.createElement('div');
-  card.className = 'rounded-lg overflow-hidden shadow-lg bg-white flex flex-col cursor-pointer border border-dashed border-gray-400';
-  card.style.backgroundImage = "url('https://i.imgur.com/1ZCGoNL.jpeg')";
-  card.style.backgroundSize = 'cover';
-  card.style.backgroundPosition = 'center';
-  card.style.height = '250px';
-  card.innerHTML = `
-    <div class="flex justify-center items-center w-full h-full bg-black/40">
-      <p class="font-bold text-lg text-white text-center px-2">Armá tu propio combo</p>
-    </div>
-  `;
-  combosContainer.appendChild(card);
-
-  card.addEventListener('click', abrirModalArmarCombo);
-}
-
-// =============================
-// CONFIGURACIÓN
-// =============================
-const SHEET_ID = '1YUK837KaCVRFGvSoBG5y0AANIAaFtD6ea00ikSrqR-o';
-const SHEET_NAME = 'Combos';
-const URL = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME}`;
-
-const combosContainer = document.getElementById('combos-container');
-const totalSpan = document.getElementById('total');
-const modal = document.getElementById('modal-carrito');
-const modalContent = document.getElementById('lista-carrito');
-const nombreInput = document.getElementById('nombre');
-const entregaInput = document.getElementById('entrega');
-const metodoPagoInputs = document.getElementsByName('pago');
-const enviarPedidoBtn = document.getElementById('enviar-whatsapp');
-const cerrarModalBtn = document.getElementById('cancelar');
-const contadorCarrito = document.getElementById('contador-carrito');
-
-let carrito = JSON.parse(localStorage.getItem('carrito')) || [];
-let combosData = [];
-
-// =============================
-// CARGA DE COMBOS PREDEFINIDOS
-// =============================
-fetch(URL)
-  .then(res => res.json())
-  .then(data => {
-    combosData = data;
-
-    data.forEach(combo => {
-      const card = document.createElement('div');
-      card.className = 'rounded-lg overflow-hidden shadow-lg bg-white flex flex-col';
-
-      const imagenUrl = combo.Imagen || combo.imagen || '';
-      const nombre = (combo.Nombre || combo.nombre || 'Sin nombre').toUpperCase();
-      const productos = combo.Productos || combo.productos || '';
-      const precio = parseFloat(combo.Precio || combo.precio || 0);
-
-      card.style.backgroundImage = `url('${imagenUrl}')`;
-      card.style.backgroundSize = 'cover';
-      card.style.backgroundPosition = 'center';
-
-      card.innerHTML = `
-        <div class="relative h-60 bg-cover bg-center rounded-t-lg" style="background-image: url('${imagenUrl}')">
-          <div class="absolute top-0 w-full bg-black/70 text-white text-center py-2 z-20">
-            <h2 class="text-lg md:text-xl font-bold uppercase px-2 truncate">${nombre}</h2>
-          </div>
-          <div class="absolute inset-0 flex items-center justify-center px-4">
-            <div class="bg-black/60 rounded p-2 w-full text-center space-y-1 max-h-[70%] overflow-y-auto mt-8 pt-4">
-              ${productos
-                .split(',')
-                .map(prod => `<p class="text-white text-sm md:text-base font-bold uppercase tracking-wide">${prod.trim()}</p>`)
-                .join('')}
-            </div>
-          </div>
-        </div>
-        <div class="bg-white px-4 py-2 flex flex-row justify-between items-center">
-          <p class="text-base font-bold text-red-700">$${precio.toLocaleString('es-AR')}</p>
-          <button class="bg-red-700 hover:bg-red-800 text-white text-sm px-3 py-1 rounded add-to-cart">
-            Agregar al carrito
-          </button>
-        </div>
-      `;
-
-      const boton = card.querySelector('.add-to-cart');
-      boton.addEventListener('click', () => {
-        carrito.push({ nombre, precio, productos });
-        localStorage.setItem('carrito', JSON.stringify(carrito));
-        actualizarTotal();
-
-        boton.classList.add('scale-110', 'transition', 'duration-150');
-        setTimeout(() => boton.classList.remove('scale-110'), 150);
+    card.querySelector(".agregar").addEventListener("click", () => {
+      agregarAlCarrito({
+        nombre: combo.Nombre,
+        precio: parseFloat(combo.Precio),
+        cantidad: 1,
       });
-
-      combosContainer.appendChild(card);
     });
 
-    // Al final, agregar card de "Armá tu propio combo"
-    crearCardArmarCombo();
-
-    actualizarTotal();
-  })
-  .catch(error => console.error('Error al cargar los datos:', error));
-
-// =============================
-// FUNCIONES CARRO
-// =============================
-function actualizarTotal() {
-  const total = carrito.reduce((sum, item) => sum + item.precio, 0);
-  totalSpan.textContent = total.toLocaleString('es-AR');
-
-  const cantidad = carrito.length;
-  if (cantidad > 0) {
-    contadorCarrito.textContent = cantidad;
-    contadorCarrito.classList.remove('hidden');
-  } else {
-    contadorCarrito.classList.add('hidden');
-  }
-}
-
-function agruparCarrito(carrito) {
-  const agrupado = [];
-  carrito.forEach(item => {
-    const existente = agrupado.find(el => el.nombre === item.nombre && el.productos === item.productos);
-    if (existente) existente.cantidad += 1;
-    else agrupado.push({ ...item, cantidad: 1 });
+    combosContainer.appendChild(card);
   });
-  return agrupado;
+
+  // Ahora cargamos la card de "Armá tu propio combo"
+  cargarCardArmarCombo();
 }
 
-function renderizarCarrito() {
-  modalContent.innerHTML = '';
-  const carritoAgrupado = agruparCarrito(carrito);
+// ============================= CARD ARMAR COMBO =============================
+function cargarCardArmarCombo() {
+  const card = document.createElement("div");
+  card.className =
+    "relative rounded-xl shadow-lg overflow-hidden bg-cover bg-center flex flex-col";
+  card.style.backgroundImage =
+    "url('https://i.imgur.com/yaM0F7y.jpg')"; // imagen de fondo personalizada
 
-  carritoAgrupado.forEach(item => {
-    const div = document.createElement('div');
-    div.className = 'mb-4 border-b pb-2';
-    const productosHTML = item.productos.split(',').map(prod => `<li>${prod.trim()}</li>`).join('');
-    div.innerHTML = `
-      <div class="flex justify-between items-start">
-        <div>
-          <p class="font-bold">${item.nombre}</p>
-          <p class="text-sm text-gray-700">Cantidad: ${item.cantidad}</p>
-          <ul class="text-sm list-disc list-inside">${productosHTML}</ul>
-          <p class="text-red-600 font-medium">$${(item.precio * item.cantidad).toLocaleString('es-AR')}</p>
-          <div class="mt-2 space-x-2">
-            <button class="bg-gray-200 px-2 rounded" onclick="cambiarCantidad('${item.nombre}', '${item.productos}', -1)">−</button>
-            <button class="bg-gray-200 px-2 rounded" onclick="cambiarCantidad('${item.nombre}', '${item.productos}', 1)">+</button>
-          </div>
-        </div>
+  card.innerHTML = `
+    <div class="bg-black/50 p-4 flex flex-col flex-grow justify-between">
+      <div>
+        <h2 class="text-xl font-bold text-white mb-2">Armá tu propio combo</h2>
+        <p class="text-sm text-gray-200 mb-2">Elegí los productos y cantidades</p>
+      </div>
+      <div>
+        <button id="abrir-armar-combo" class="bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded">
+          Armar Combo
+        </button>
+      </div>
+    </div>
+  `;
+
+  card.querySelector("#abrir-armar-combo").addEventListener("click", async () => {
+    await cargarProductos();
+    modalArmarCombo.classList.remove("hidden");
+  });
+
+  // Se agrega al FINAL
+  combosContainer.appendChild(card);
+}
+
+// ============================= CARGA DE PRODUCTOS =============================
+async function cargarProductos() {
+  const res = await fetch(URL_PRODUCTOS);
+  productosDisponibles = await res.json();
+
+  listaProductos.innerHTML = "";
+
+  productosDisponibles.forEach((prod, index) => {
+    const row = document.createElement("div");
+    row.className = "flex justify-between items-center border-b pb-2";
+
+    row.innerHTML = `
+      <span class="flex-1">${prod.Producto}</span>
+      <div class="flex items-center gap-2">
+        <button class="menos bg-gray-300 px-2 rounded">-</button>
+        <input 
+          type="number" 
+          step="0.5" 
+          min="0" 
+          value="0" 
+          class="cantidad w-16 text-center border rounded" 
+          data-precio="${prod.Precio}" 
+          data-nombre="${prod.Producto}"
+        />
+        <button class="mas bg-gray-300 px-2 rounded">+</button>
+        <span class="ml-2">$<span class="subtotal">0</span></span>
       </div>
     `;
-    modalContent.appendChild(div);
-  });
-}
 
-function cambiarCantidad(nombre, productos, cambio) {
-  const index = carrito.findIndex(item => item.nombre === nombre && item.productos === productos);
-  if (index !== -1) {
-    if (cambio === -1) carrito.splice(index, 1);
-    else if (cambio === 1) carrito.push({ nombre, productos, precio: carrito[index].precio });
-    localStorage.setItem('carrito', JSON.stringify(carrito));
-    actualizarTotal();
-    renderizarCarrito();
-  }
-}
-
-document.getElementById('ver-carrito').addEventListener('click', () => {
-  if (carrito.length === 0) { alert('El carrito está vacío.'); return; }
-  renderizarCarrito();
-  modal.classList.remove('hidden');
-});
-
-cerrarModalBtn.addEventListener('click', () => modal.classList.add('hidden'));
-
-enviarPedidoBtn.addEventListener('click', () => {
-  if (carrito.length === 0) { alert('El carrito está vacío.'); return; }
-
-  const nombre = nombreInput.value.trim();
-  const entrega = entregaInput.value.trim();
-  const metodoPago = Array.from(metodoPagoInputs).find(r => r.checked)?.value;
-
-  if (!nombre || !entrega || !metodoPago) { alert('Por favor, completá todos los campos.'); return; }
-
-  let mensaje = `*Pedido de Combos de Carnicería*\n\n*Cliente:* ${nombre}\n*Entrega:* ${entrega}\n*Método de pago:* ${metodoPago}\n\n`;
-  const agrupado = agruparCarrito(carrito);
-  agrupado.forEach(item => {
-    mensaje += `*${item.nombre}* x${item.cantidad} - $${(item.precio * item.cantidad).toLocaleString('es-AR')}\n`;
-    item.productos.split(',').forEach(prod => mensaje += `  - ${prod.trim()}\n`);
-    mensaje += `\n`;
-  });
-  mensaje += `*Total:* $${carrito.reduce((sum, item) => sum + item.precio, 0).toLocaleString('es-AR')}`;
-
-  const numeroWhatsApp = '5492213074708';
-  window.open(`https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensaje)}`, '_blank');
-
-  carrito = [];
-  localStorage.removeItem('carrito');
-  actualizarTotal();
-  modal.classList.add('hidden');
-  nombreInput.value = '';
-  entregaInput.value = '';
-  metodoPagoInputs.forEach(r => r.checked = false);
-});
-
-// =============================
-// ARMAR TU PROPIO COMBO
-// =============================
-const modalArmarCombo = document.getElementById('modal-armar-combo');
-const listaProductos = document.getElementById('lista-productos');
-const btnCancelarCombo = document.getElementById('cancelar-combo');
-const btnAgregarCombo = document.getElementById('agregar-combo-carrito');
-let productosData = [];
-
-function crearCardArmarCombo() {
-  const card = document.createElement('div');
-  card.className = 'rounded-lg overflow-hidden shadow-lg bg-white flex flex-col cursor-pointer border border-dashed border-gray-400';
-  card.style.backgroundImage = "url('https://i.imgur.com/1ZCGoNL.jpeg')";
-  card.style.backgroundSize = 'cover';
-  card.style.backgroundPosition = 'center';
-  card.style.height = '250px';
-  card.innerHTML = `
-    <div class="flex justify-center items-center w-full h-full bg-black/40">
-      <p class="font-bold text-lg text-white text-center px-2">Armá tu propio combo</p>
-    </div>
-  `;
-  combosContainer.appendChild(card);
-
-  card.addEventListener('click', abrirModalArmarCombo);
-}
-
-function abrirModalArmarCombo() {
-  fetch(`https://opensheet.elk.sh/${SHEET_ID}/Productos`)
-    .then(res => res.json())
-    .then(data => {
-      productosData = data;
-      listaProductos.innerHTML = '';
-
-      data.forEach(prod => {
-        const div = document.createElement('div');
-        div.className = 'flex justify-between items-center border-b py-2 gap-2';
-
-        const nombreSpan = document.createElement('span');
-        nombreSpan.className = 'text-gray-700 flex-1';
-        nombreSpan.textContent = `${prod.Producto} ($${parseFloat(prod.Precio).toLocaleString('es-AR')}/kg)`;
-
-        const controlesDiv = document.createElement('div');
-        controlesDiv.className = 'flex items-center gap-1';
-
-        const botonMenos = document.createElement('button');
-        botonMenos.textContent = '−';
-        botonMenos.className = 'bg-gray-200 px-2 rounded text-lg';
-        
-        const cantidadInput = document.createElement('span');
-        cantidadInput.textContent = '0';
-        cantidadInput.className = 'w-12 text-center';
-
-        const botonMas = document.createElement('button');
-        botonMas.textContent = '+';
-        botonMas.className = 'bg-gray-200 px-2 rounded text-lg';
-
-        const unidadSpan = document.createElement('span');
-        unidadSpan.textContent = 'kg';
-        unidadSpan.className = 'ml-1 w-6';
-
-        const totalSpan = document.createElement('span');
-        totalSpan.className = 'font-bold text-red-700 w-24 text-right';
-        totalSpan.textContent = '$0';
-
-        let cantidad = 0;
-
-        function actualizarTotal() {
-          totalSpan.textContent = `$${(cantidad * parseFloat(prod.Precio)).toLocaleString('es-AR')}`;
-          actualizarTotalModal();
-        }
-
-        botonMas.addEventListener('click', () => {
-          cantidad = parseFloat((cantidad + 0.5).toFixed(2));
-          cantidadInput.textContent = cantidad;
-          actualizarTotal();
-        });
-
-        botonMenos.addEventListener('click', () => {
-          cantidad = parseFloat((Math.max(0, cantidad - 0.5)).toFixed(2));
-          cantidadInput.textContent = cantidad;
-          actualizarTotal();
-        });
-
-        controlesDiv.appendChild(botonMenos);
-        controlesDiv.appendChild(cantidadInput);
-        controlesDiv.appendChild(botonMas);
-
-        div.appendChild(nombreSpan);
-        div.appendChild(controlesDiv);
-        div.appendChild(unidadSpan);
-        div.appendChild(totalSpan);
-
-        listaProductos.appendChild(div);
-      });
-
-      const totalGeneralDiv = document.createElement('div');
-      totalGeneralDiv.id = 'total-general-combo';
-      totalGeneralDiv.className = 'mt-4 text-right font-bold text-red-700 text-lg';
-      totalGeneralDiv.textContent = 'Total: $0';
-      listaProductos.appendChild(totalGeneralDiv);
-
-      modalArmarCombo.classList.remove('hidden');
+    // Botón menos
+    row.querySelector(".menos").addEventListener("click", () => {
+      const input = row.querySelector(".cantidad");
+      let val = parseFloat(input.value);
+      if (val > 0) {
+        val = Math.max(0, val - 0.5);
+        input.value = val.toFixed(1);
+        actualizarSubtotal(row);
+      }
     });
+
+    // Botón más
+    row.querySelector(".mas").addEventListener("click", () => {
+      const input = row.querySelector(".cantidad");
+      let val = parseFloat(input.value);
+      val += 0.5;
+      input.value = val.toFixed(1);
+      actualizarSubtotal(row);
+    });
+
+    // Input manual
+    row.querySelector(".cantidad").addEventListener("input", () => {
+      actualizarSubtotal(row);
+    });
+
+    listaProductos.appendChild(row);
+  });
+
+  // Agregamos el totalizador al final
+  const totalDiv = document.createElement("div");
+  totalDiv.className = "text-right font-bold mt-4";
+  totalDiv.innerHTML = `Total: $<span id="total-combo">0</span>`;
+  listaProductos.appendChild(totalDiv);
 }
 
-function actualizarTotalModal() {
-  const renglones = listaProductos.querySelectorAll('div.flex.justify-between.items-center');
+function actualizarSubtotal(row) {
+  const input = row.querySelector(".cantidad");
+  const subtotalEl = row.querySelector(".subtotal");
+  const precio = parseFloat(input.dataset.precio);
+  const cantidad = parseFloat(input.value);
+
+  const subtotal = cantidad * precio;
+  subtotalEl.textContent = subtotal.toLocaleString("es-AR");
+
+  actualizarTotalCombo();
+}
+
+function actualizarTotalCombo() {
+  const cantidades = listaProductos.querySelectorAll(".cantidad");
   let total = 0;
-  renglones.forEach(div => {
-    const totalSpan = div.querySelector('span.font-bold.text-red-700');
-    if (totalSpan) {
-      const valor = parseFloat(totalSpan.textContent.replace(/\$|,/g, '')) || 0;
-      total += valor;
-    }
+  cantidades.forEach((input) => {
+    const precio = parseFloat(input.dataset.precio);
+    const cantidad = parseFloat(input.value);
+    total += precio * cantidad;
   });
-  const totalDiv = document.getElementById('total-general-combo');
-  if (totalDiv) totalDiv.textContent = `Total: $${total.toLocaleString('es-AR')}`;
+
+  const totalEl = document.getElementById("total-combo");
+  if (totalEl) {
+    totalEl.textContent = total.toLocaleString("es-AR");
+  }
 }
 
-btnCancelarCombo.addEventListener('click', () => modalArmarCombo.classList.add('hidden'));
+// ============================= CARRITO =============================
+function agregarAlCarrito(producto) {
+  carrito.push(producto);
+  actualizarCarrito();
+}
 
-btnAgregarCombo.addEventListener('click', () => {
-  const inputs = listaProductos.querySelectorAll('.producto-cantidad');
-  let comboNombre = 'Combo personalizado';
-  let comboProductos = [];
-  let comboPrecio = 0;
+function actualizarCarrito() {
+  listaCarrito.innerHTML = "";
+  let total = 0;
 
-  inputs.forEach(input => {
+  carrito.forEach((item, index) => {
+    const div = document.createElement("div");
+    div.className = "flex justify-between items-center mb-2";
+
+    div.innerHTML = `
+      <span>${item.nombre} (x${item.cantidad})</span>
+      <span>$${(item.precio * item.cantidad).toLocaleString("es-AR")}</span>
+      <button class="text-red-600" data-index="${index}">✖</button>
+    `;
+
+    div.querySelector("button").addEventListener("click", () => {
+      carrito.splice(index, 1);
+      actualizarCarrito();
+    });
+
+    listaCarrito.appendChild(div);
+    total += item.precio * item.cantidad;
+  });
+
+  contadorCarrito.textContent = carrito.length;
+  totalCarritoEl.textContent = total.toLocaleString("es-AR");
+}
+
+// ============================= EVENTOS DEL MODAL CARRITO =============================
+btnVerCarrito.addEventListener("click", () =>
+  modalCarrito.classList.remove("hidden")
+);
+btnCancelar.addEventListener("click", () =>
+  modalCarrito.classList.add("hidden")
+);
+
+// ============================= EVENTOS DEL MODAL ARMAR COMBO =============================
+btnCancelarCombo.addEventListener("click", () =>
+  modalArmarCombo.classList.add("hidden")
+);
+
+btnAgregarCombo.addEventListener("click", () => {
+  const cantidades = listaProductos.querySelectorAll(".cantidad");
+  let productosSeleccionados = [];
+  let total = 0;
+
+  cantidades.forEach((input) => {
     const cantidad = parseFloat(input.value);
     if (cantidad > 0) {
       const nombre = input.dataset.nombre;
-      const precioUnit = parseFloat(input.dataset.precio);
-      comboProductos.push(`${nombre} (${cantidad} kg)`);
-      comboPrecio += precioUnit * cantidad;
+      const precio = parseFloat(input.dataset.precio);
+      productosSeleccionados.push(`${cantidad} kg de ${nombre}`);
+      total += cantidad * precio;
     }
   });
 
-  if (comboProductos.length === 0) {
-    alert('Seleccioná al menos un producto.');
-    return;
+  if (productosSeleccionados.length > 0) {
+    agregarAlCarrito({
+      nombre: "Combo personalizado: " + productosSeleccionados.join(", "),
+      precio: total,
+      cantidad: 1,
+    });
   }
 
-  carrito.push({
-    nombre: comboNombre,
-    productos: comboProductos.join(', '),
-    precio: comboPrecio
-  });
-
-  actualizarTotal();
-  modalArmarCombo.classList.add('hidden');
+  modalArmarCombo.classList.add("hidden");
 });
 
-btnCancelarCombo.addEventListener('click', () => modalArmarCombo.classList.add('hidden'));
-
-btnAgregarCombo.addEventListener('click', () => {
-  const inputs = listaProductos.querySelectorAll('.producto-cantidad');
-  let comboNombre = 'Combo personalizado';
-  let comboProductos = [];
-  let comboPrecio = 0;
-
-  inputs.forEach(input => {
-    const cantidad = parseFloat(input.value);
-    if (cantidad > 0) {
-      const nombre = input.dataset.nombre;
-      const precioUnit = parseFloat(input.dataset.precio);
-      comboProductos.push(`${nombre} (${cantidad} kg)`);
-      comboPrecio += precioUnit * cantidad;
-    }
-  });
-
-  if (comboProductos.length === 0) {
-    alert('Seleccioná al menos un producto.');
-    return;
-  }
-
-  carrito.push({
-    nombre: comboNombre,
-    productos: comboProductos.join(', '),
-    precio: comboPrecio
-  });
-
-  actualizarTotal();
-  modalArmarCombo.classList.add('hidden');
-});
+// ============================= INICIO =============================
+cargarCombos();
