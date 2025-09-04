@@ -43,6 +43,11 @@ function formatNum(num) {
   return Number(num).toLocaleString('es-AR');
 }
 
+function capitalizar(str) {
+  if (!str) return '';
+  return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+}
+
 // -----------------------------
 // CARGAR CONFIG
 // -----------------------------
@@ -299,7 +304,9 @@ async function openModalArmarCombo() {
 
       const nombreSpan = document.createElement('span');
       nombreSpan.className = 'text-gray-700 flex-1';
-      nombreSpan.textContent = `${prod.Producto} ($${formatNum(parseFloat(prod.Precio) || 0)}/kg)`;
+      nombreSpan.textContent = `${capitalizar(prod.Producto)} ($${formatNum(parseFloat(prod.Precio) || 0)})`;
+
+      
 
       const controlesDiv = document.createElement('div');
       controlesDiv.className = 'flex items-center gap-2';
