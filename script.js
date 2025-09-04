@@ -1,5 +1,5 @@
 // =============================
-// script.js limpio y consolidado
+// script.js con SweetAlert2
 // =============================
 
 // --- CONFIGURACIÓN ---
@@ -9,7 +9,7 @@ const SHEET_NAME_PRODUCTOS = 'Productos';
 const URL_COMBOS = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME_COMBOS}`;
 const URL_PRODUCTOS = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME_PRODUCTOS}`;
 
-// --- SELECTORES DOM (coinciden con tu HTML) ---
+// --- SELECTORES DOM ---
 const combosContainer = document.getElementById('combos-container');
 const totalSpan = document.getElementById('total');
 const modalCarrito = document.getElementById('modal-carrito');
@@ -36,7 +36,6 @@ let productosData = [];
 // UTIL: formatea número argentino
 // -----------------------------
 function formatNum(num) {
-  // evita errores con NaN
   if (!isFinite(num)) return '0';
   return Number(num).toLocaleString('es-AR');
 }
@@ -81,11 +80,9 @@ async function cargarCombos() {
 
       const boton = card.querySelector('.add-to-cart');
       boton.addEventListener('click', () => {
-        // agregamos item tal como esperan las otras funciones
         carrito.push({ nombre, precio, productos });
         persistCarrito();
         actualizarTotal();
-        // animación visual
         boton.classList.add('scale-110', 'transition', 'duration-150');
         setTimeout(() => boton.classList.remove('scale-110'), 150);
       });
@@ -93,13 +90,15 @@ async function cargarCombos() {
       combosContainer.appendChild(card);
     });
 
-    // después de renderizar todos los combos predefinidos, agrego la card "Armá tu propio combo"
     crearCardArmarCombo();
-
-    // actualizar totales iniciales
     actualizarTotal();
   } catch (err) {
-    console.error('Error al cargar combos:', err);
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'No se pudieron cargar los combos. Revisá la conexión.'
+    });
+    console.error(err);
   }
 }
 
@@ -163,10 +162,7 @@ function renderizarCarrito() {
       </div>
     `.trim();
 
-    // event handlers para decrease/increase/remove (operan sobre carrito original: eliminan/añaden item unitario)
     div.querySelector('.btn-decrease').addEventListener('click', () => {
-      // quitar una unidad equivalente a este agrupado
-      // buscamos en carrito el primer ítem que coincida y lo removemos
       const idx = carrito.findIndex(ci => ci.nombre === item.nombre && (ci.productos || '') === (item.productos || '') && Number(ci.precio) === Number(item.precio));
       if (idx !== -1) {
         carrito.splice(idx, 1);
@@ -184,7 +180,6 @@ function renderizarCarrito() {
     });
 
     div.querySelector('.btn-remove').addEventListener('click', () => {
-      // quitar todas las ocurrencias de este ítem
       carrito = carrito.filter(ci => !(ci.nombre === item.nombre && (ci.productos || '') === (item.productos || '') && Number(ci.precio) === Number(item.precio)));
       persistCarrito();
       actualizarTotal();
@@ -199,14 +194,25 @@ function renderizarCarrito() {
 // ENVIAR POR WHATSAPP
 // -----------------------------
 enviarPedidoBtn.addEventListener('click', () => {
-  if (carrito.length === 0) { alert('El carrito está vacío.'); return; }
+  if (carrito.length === 0) { 
+    Swal.fire({
+      icon: 'warning',
+      title: 'Carrito vacío',
+      text: 'Tu carrito está vacío 🛒. Agregá algún combo antes de continuar.'
+    });
+    return;
+  }
 
   const nombre = (nombreInput.value || '').trim();
   const entrega = (entregaInput.value || '').trim();
   const metodoPago = Array.from(metodoPagoInputs).find(r => r.checked)?.value;
 
   if (!nombre || !entrega || !metodoPago) {
-    alert('Por favor, completá todos los campos.');
+    Swal.fire({
+      icon: 'info',
+      title: 'Campos incompletos',
+      text: 'Por favor, completá tu nombre, dirección y método de pago.'
+    });
     return;
   }
 
@@ -229,7 +235,6 @@ enviarPedidoBtn.addEventListener('click', () => {
   const url = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensaje)}`;
   window.open(url, '_blank');
 
-  // limpiar carrito
   carrito = [];
   persistCarrito();
   actualizarTotal();
@@ -240,7 +245,7 @@ enviarPedidoBtn.addEventListener('click', () => {
 });
 
 // -----------------------------
-// CREAR CARD "ARMÁ TU PROPIO COMBO" (al final del grid)
+// CREAR CARD "ARMÁ TU PROPIO COMBO"
 // -----------------------------
 function crearCardArmarCombo() {
   const card = document.createElement('div');
@@ -256,10 +261,7 @@ function crearCardArmarCombo() {
     </div>
   `.trim();
 
-  // siempre al final
   combosContainer.appendChild(card);
-
-  // abrir modal custom al click
   card.addEventListener('click', () => {
     openModalArmarCombo();
   });
@@ -273,16 +275,11 @@ async function openModalArmarCombo() {
     const res = await fetch(URL_PRODUCTOS);
     const data = await res.json();
     productosData = data || [];
-
-    // limpiar lista
     listaProductos.innerHTML = '';
 
-    // crear renglones
     productosData.forEach(prod => {
-      // prod.Producto, prod.Precio
       const row = document.createElement('div');
       row.className = 'flex justify-between items-center border-b py-2 gap-2';
-      // guardamos valores numéricos en data-attrs del row
       row.dataset.nombre = prod.Producto;
       row.dataset.precio = String(parseFloat(prod.Precio) || 0);
       row.dataset.cantidad = '0';
@@ -318,131 +315,96 @@ async function openModalArmarCombo() {
       subtotalSpan.textContent = `$0`;
       subtotalSpan.dataset.valor = '0';
 
-      // helpers
       function actualizarRow() {
         const precio = parseFloat(row.dataset.precio) || 0;
         const cantidad = parseFloat(row.dataset.cantidad) || 0;
-        const subtotal = Math.round((precio * cantidad) * 100) / 100; // 2 decimales
+        const subtotal = Math.round((precio * cantidad) * 100) / 100;
         row.dataset.subtotal = String(subtotal);
         subtotalSpan.dataset.valor = String(subtotal);
         subtotalSpan.textContent = `$${formatNum(subtotal)}`;
-        cantidadSpan.textContent = String(cantidad % 1 === 0 ? cantidad.toFixed(0) : cantidad.toFixed(1)); // muestra 0.5 o entero
-        actualizarTotalModal();
+        cantidadSpan.textContent = String(cantidad % 1 === 0 ? cantidad : cantidad.toFixed(1));
       }
 
       btnMas.addEventListener('click', () => {
-        const current = parseFloat(row.dataset.cantidad) || 0;
-        row.dataset.cantidad = String(Math.round((current + 0.5) * 100) / 100);
+        let cant = parseFloat(row.dataset.cantidad) || 0;
+        cant += 0.5;
+        row.dataset.cantidad = String(cant);
         actualizarRow();
       });
 
       btnMenos.addEventListener('click', () => {
-        const current = parseFloat(row.dataset.cantidad) || 0;
-        row.dataset.cantidad = String(Math.max(0, Math.round((current - 0.5) * 100) / 100));
+        let cant = parseFloat(row.dataset.cantidad) || 0;
+        cant = Math.max(0, cant - 0.5);
+        row.dataset.cantidad = String(cant);
         actualizarRow();
-      });
-
-      // permitir edición manual por teclado (opcional)
-      cantidadSpan.addEventListener('input', () => {
-        // no editable (es span), we don't support paste - keep buttons for mobile
       });
 
       controlesDiv.appendChild(btnMenos);
       controlesDiv.appendChild(cantidadSpan);
       controlesDiv.appendChild(btnMas);
+      controlesDiv.appendChild(unidadSpan);
+      controlesDiv.appendChild(subtotalSpan);
 
       row.appendChild(nombreSpan);
       row.appendChild(controlesDiv);
-      row.appendChild(unidadSpan);
-      row.appendChild(subtotalSpan);
-
       listaProductos.appendChild(row);
     });
 
-    // total general (si ya no existe lo creamos)
-    let totalGeneral = document.getElementById('total-general-combo');
-    if (!totalGeneral) {
-      totalGeneral = document.createElement('div');
-      totalGeneral.id = 'total-general-combo';
-      totalGeneral.className = 'mt-4 text-right font-bold text-red-700 text-lg';
-      listaProductos.appendChild(totalGeneral);
-    }
-    totalGeneral.textContent = `Total: $0`;
-
-    // abrir modal
     modalArmarCombo.classList.remove('hidden');
   } catch (err) {
-    console.error('Error al cargar productos:', err);
-    alert('No se pudieron cargar los productos. Revisá la conexión.');
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'No se pudieron cargar los productos para armar el combo.'
+    });
+    console.error(err);
   }
 }
 
 // -----------------------------
-// ACTUALIZAR TOTAL DEL MODAL ARMAR COMBO
+// CERRAR MODALES
 // -----------------------------
-function actualizarTotalModal() {
-  const filas = listaProductos.querySelectorAll('div[data-nombre]');
-  let total = 0;
-  filas.forEach(f => {
-    total += parseFloat(f.dataset.subtotal) || 0;
-  });
-  const totalDiv = document.getElementById('total-general-combo');
-  if (totalDiv) totalDiv.textContent = `Total: $${formatNum(total)}`;
-}
-
-// -----------------------------
-// AGREGAR COMBO PERSONALIZADO AL CARRITO
-// -----------------------------
-btnAgregarCombo.addEventListener('click', () => {
-  const filas = listaProductos.querySelectorAll('div[data-nombre]');
-  let comboProductos = [];
-  let comboPrecio = 0;
-
-  filas.forEach(f => {
-    const cantidad = parseFloat(f.dataset.cantidad) || 0;
-    const precio = parseFloat(f.dataset.precio) || 0;
-    const nombre = f.dataset.nombre;
-    if (cantidad > 0) {
-      comboProductos.push(`${nombre} (${cantidad} kg)`);
-      comboPrecio += cantidad * precio;
-    }
-  });
-
-  if (comboProductos.length === 0) {
-    alert('Seleccioná al menos un producto.');
-    return;
-  }
-
-  // agregamos un solo ítem con precio total (cantidad interna no importa, lo tratamos como 1 unidad de combo)
-  carrito.push({
-    nombre: 'Combo personalizado',
-    productos: comboProductos.join(', '),
-    precio: Math.round(comboPrecio * 100) / 100,
-    cantidad: 1
-  });
-
-  persistCarrito();
-  actualizarTotal();
-  modalArmarCombo.classList.add('hidden');
-
-  // limpiar listaProductos para que al reabrir empiece en 0
-  listaProductos.innerHTML = '';
-});
-
-// -----------------------------
-// EVENTOS UI CARRITO / MODALES
-// -----------------------------
-verCarritoBtn.addEventListener('click', () => {
-  if (carrito.length === 0) { alert('El carrito está vacío.'); return; }
-  renderizarCarrito();
-  modalCarrito.classList.remove('hidden');
-});
-
 cerrarModalBtn.addEventListener('click', () => modalCarrito.classList.add('hidden'));
 btnCancelarCombo.addEventListener('click', () => modalArmarCombo.classList.add('hidden'));
 
 // -----------------------------
-// INICIALIZACIÓN
+// AGREGAR COMBO PERSONALIZADO
+// -----------------------------
+btnAgregarCombo.addEventListener('click', () => {
+  const rows = Array.from(listaProductos.children);
+  const seleccionados = rows.filter(r => parseFloat(r.dataset.cantidad) > 0);
+  if (seleccionados.length === 0) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Combo vacío',
+      text: 'Tenés que elegir al menos un producto para armar tu combo.'
+    });
+    return;
+  }
+
+  const productos = seleccionados.map(r => `${r.dataset.nombre} (${r.dataset.cantidad}kg)`).join(', ');
+  const precio = seleccionados.reduce((s, r) => s + (parseFloat(r.dataset.subtotal) || 0), 0);
+
+  carrito.push({ nombre: 'Combo Personalizado', productos, precio });
+  persistCarrito();
+  actualizarTotal();
+  modalArmarCombo.classList.add('hidden');
+  Swal.fire({
+    icon: 'success',
+    title: 'Combo agregado',
+    text: 'Tu combo personalizado fue agregado al carrito.'
+  });
+});
+
+// -----------------------------
+// EVENTOS DEL CARRITO
+// -----------------------------
+verCarritoBtn.addEventListener('click', () => {
+  renderizarCarrito();
+  modalCarrito.classList.remove('hidden');
+});
+
+// -----------------------------
+// INICIO
 // -----------------------------
 cargarCombos();
-actualizarTotal();
