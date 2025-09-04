@@ -1,13 +1,15 @@
 // =============================
-// script.js con SweetAlert2
+// script.js con validación de mínimo pedido
 // =============================
 
 // --- CONFIGURACIÓN ---
 const SHEET_ID = '1YUK837KaCVRFGvSoBG5y0AANIAaFtD6ea00ikSrqR-o';
 const SHEET_NAME_COMBOS = 'Combos';
 const SHEET_NAME_PRODUCTOS = 'Productos';
+const SHEET_NAME_CONFIG = 'Config'; // <--- nueva hoja
 const URL_COMBOS = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME_COMBOS}`;
 const URL_PRODUCTOS = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME_PRODUCTOS}`;
+const URL_CONFIG = `https://opensheet.elk.sh/${SHEET_ID}/${SHEET_NAME_CONFIG}`;
 
 // --- SELECTORES DOM ---
 const combosContainer = document.getElementById('combos-container');
@@ -31,6 +33,7 @@ const btnAgregarCombo = document.getElementById('agregar-combo-carrito');
 let carrito = JSON.parse(localStorage.getItem('carrito')) || [];
 let combosData = [];
 let productosData = [];
+let configData = { MinimoPedido: 0 }; // valor inicial
 
 // -----------------------------
 // UTIL: formatea número argentino
@@ -38,6 +41,23 @@ let productosData = [];
 function formatNum(num) {
   if (!isFinite(num)) return '0';
   return Number(num).toLocaleString('es-AR');
+}
+
+// -----------------------------
+// CARGAR CONFIG
+// -----------------------------
+async function cargarConfig() {
+  try {
+    const res = await fetch(URL_CONFIG);
+    const data = await res.json();
+    if (data && data.length > 0) {
+      const min = parseFloat(data[0].MinimoPedido || 0);
+      configData.MinimoPedido = isFinite(min) ? min : 0;
+    }
+  } catch (err) {
+    console.error('Error al cargar Config:', err);
+    configData.MinimoPedido = 0;
+  }
 }
 
 // -----------------------------
@@ -51,7 +71,7 @@ async function cargarCombos() {
 
     combosData.forEach(combo => {
       const imagenUrl = combo.Imagen || combo.imagen || '';
-      const nombre = (combo.Nombre || combo.nombre || 'Sin nombre');
+      const nombre = combo.Nombre || combo.nombre || 'Sin nombre';
       const productos = combo.Productos || combo.productos || '';
       const precio = parseFloat(combo.Precio || combo.precio || 0);
 
@@ -85,6 +105,7 @@ async function cargarCombos() {
         actualizarTotal();
         boton.classList.add('scale-110', 'transition', 'duration-150');
         setTimeout(() => boton.classList.remove('scale-110'), 150);
+        Swal.fire('✔️ Agregado', `${nombre} se agregó al carrito`, 'success');
       });
 
       combosContainer.appendChild(card);
@@ -93,12 +114,7 @@ async function cargarCombos() {
     crearCardArmarCombo();
     actualizarTotal();
   } catch (err) {
-    Swal.fire({
-      icon: 'error',
-      title: 'Error',
-      text: 'No se pudieron cargar los combos. Revisá la conexión.'
-    });
-    console.error(err);
+    console.error('Error al cargar combos:', err);
   }
 }
 
@@ -194,12 +210,8 @@ function renderizarCarrito() {
 // ENVIAR POR WHATSAPP
 // -----------------------------
 enviarPedidoBtn.addEventListener('click', () => {
-  if (carrito.length === 0) { 
-    Swal.fire({
-      icon: 'warning',
-      title: 'Carrito vacío',
-      text: 'Tu carrito está vacío 🛒. Agregá algún combo antes de continuar.'
-    });
+  if (carrito.length === 0) {
+    Swal.fire('⚠️ Carrito vacío', 'Agregá al menos un combo antes de enviar tu pedido.', 'warning');
     return;
   }
 
@@ -208,11 +220,13 @@ enviarPedidoBtn.addEventListener('click', () => {
   const metodoPago = Array.from(metodoPagoInputs).find(r => r.checked)?.value;
 
   if (!nombre || !entrega || !metodoPago) {
-    Swal.fire({
-      icon: 'info',
-      title: 'Campos incompletos',
-      text: 'Por favor, completá tu nombre, dirección y método de pago.'
-    });
+    Swal.fire('⚠️ Campos incompletos', 'Por favor, completá tu nombre, dirección y método de pago.', 'warning');
+    return;
+  }
+
+  const total = carrito.reduce((s, i) => s + (Number(i.precio) || 0) * (Number(i.cantidad) || 1), 0);
+  if (total < configData.MinimoPedido) {
+    Swal.fire('⚠️ Pedido mínimo', `El pedido debe superar los $${formatNum(configData.MinimoPedido)} para poder enviarse.`, 'warning');
     return;
   }
 
@@ -228,7 +242,6 @@ enviarPedidoBtn.addEventListener('click', () => {
     mensaje += `\n`;
   });
 
-  const total = carrito.reduce((s, i) => s + (Number(i.precio) || 0) * (Number(i.cantidad) || 1), 0);
   mensaje += `*Total:* $${formatNum(total)}`;
 
   const numeroWhatsApp = '5492213074708';
@@ -245,7 +258,7 @@ enviarPedidoBtn.addEventListener('click', () => {
 });
 
 // -----------------------------
-// CREAR CARD "ARMÁ TU PROPIO COMBO"
+// CARD "ARMÁ TU PROPIO COMBO"
 // -----------------------------
 function crearCardArmarCombo() {
   const card = document.createElement('div');
@@ -262,9 +275,7 @@ function crearCardArmarCombo() {
   `.trim();
 
   combosContainer.appendChild(card);
-  card.addEventListener('click', () => {
-    openModalArmarCombo();
-  });
+  card.addEventListener('click', () => openModalArmarCombo());
 }
 
 // -----------------------------
@@ -275,6 +286,7 @@ async function openModalArmarCombo() {
     const res = await fetch(URL_PRODUCTOS);
     const data = await res.json();
     productosData = data || [];
+
     listaProductos.innerHTML = '';
 
     productosData.forEach(prod => {
@@ -322,89 +334,119 @@ async function openModalArmarCombo() {
         row.dataset.subtotal = String(subtotal);
         subtotalSpan.dataset.valor = String(subtotal);
         subtotalSpan.textContent = `$${formatNum(subtotal)}`;
-        cantidadSpan.textContent = String(cantidad % 1 === 0 ? cantidad : cantidad.toFixed(1));
+        cantidadSpan.textContent = String(cantidad % 1 === 0 ? cantidad.toFixed(0) : cantidad.toFixed(1));
+        actualizarTotalModal();
       }
 
       btnMas.addEventListener('click', () => {
-        let cant = parseFloat(row.dataset.cantidad) || 0;
-        cant += 0.5;
-        row.dataset.cantidad = String(cant);
+        const current = parseFloat(row.dataset.cantidad) || 0;
+        row.dataset.cantidad = String(Math.round((current + 0.5) * 100) / 100);
         actualizarRow();
       });
 
       btnMenos.addEventListener('click', () => {
-        let cant = parseFloat(row.dataset.cantidad) || 0;
-        cant = Math.max(0, cant - 0.5);
-        row.dataset.cantidad = String(cant);
+        const current = parseFloat(row.dataset.cantidad) || 0;
+        row.dataset.cantidad = String(Math.max(0, Math.round((current - 0.5) * 100) / 100));
         actualizarRow();
       });
 
       controlesDiv.appendChild(btnMenos);
       controlesDiv.appendChild(cantidadSpan);
       controlesDiv.appendChild(btnMas);
-      controlesDiv.appendChild(unidadSpan);
-      controlesDiv.appendChild(subtotalSpan);
 
       row.appendChild(nombreSpan);
       row.appendChild(controlesDiv);
+      row.appendChild(unidadSpan);
+      row.appendChild(subtotalSpan);
+
       listaProductos.appendChild(row);
     });
 
+    let totalGeneral = document.getElementById('total-general-combo');
+    if (!totalGeneral) {
+      totalGeneral = document.createElement('div');
+      totalGeneral.id = 'total-general-combo';
+      totalGeneral.className = 'mt-4 text-right font-bold text-red-700 text-lg';
+      listaProductos.appendChild(totalGeneral);
+    }
+    totalGeneral.textContent = `Total: $0`;
+
     modalArmarCombo.classList.remove('hidden');
   } catch (err) {
-    Swal.fire({
-      icon: 'error',
-      title: 'Error',
-      text: 'No se pudieron cargar los productos para armar el combo.'
-    });
-    console.error(err);
+    console.error('Error al cargar productos:', err);
+    Swal.fire('❌ Error', 'No se pudieron cargar los productos. Revisá la conexión.', 'error');
   }
 }
 
 // -----------------------------
-// CERRAR MODALES
+// ACTUALIZAR TOTAL DEL MODAL ARMAR COMBO
 // -----------------------------
-cerrarModalBtn.addEventListener('click', () => modalCarrito.classList.add('hidden'));
-btnCancelarCombo.addEventListener('click', () => modalArmarCombo.classList.add('hidden'));
+function actualizarTotalModal() {
+  const filas = listaProductos.querySelectorAll('div[data-nombre]');
+  let total = 0;
+  filas.forEach(f => {
+    total += parseFloat(f.dataset.subtotal) || 0;
+  });
+  const totalDiv = document.getElementById('total-general-combo');
+  if (totalDiv) totalDiv.textContent = `Total: $${formatNum(total)}`;
+}
 
 // -----------------------------
-// AGREGAR COMBO PERSONALIZADO
+// AGREGAR COMBO PERSONALIZADO AL CARRITO
 // -----------------------------
 btnAgregarCombo.addEventListener('click', () => {
-  const rows = Array.from(listaProductos.children);
-  const seleccionados = rows.filter(r => parseFloat(r.dataset.cantidad) > 0);
-  if (seleccionados.length === 0) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'Combo vacío',
-      text: 'Tenés que elegir al menos un producto para armar tu combo.'
-    });
+  const filas = listaProductos.querySelectorAll('div[data-nombre]');
+  let comboProductos = [];
+  let comboPrecio = 0;
+
+  filas.forEach(f => {
+    const cantidad = parseFloat(f.dataset.cantidad) || 0;
+    const precio = parseFloat(f.dataset.precio) || 0;
+    const nombre = f.dataset.nombre;
+    if (cantidad > 0) {
+      comboProductos.push(`${nombre} (${cantidad} kg)`);
+      comboPrecio += cantidad * precio;
+    }
+  });
+
+  if (comboProductos.length === 0) {
+    Swal.fire('⚠️ Sin productos', 'Seleccioná al menos un producto para armar tu combo.', 'warning');
     return;
   }
 
-  const productos = seleccionados.map(r => `${r.dataset.nombre} (${r.dataset.cantidad}kg)`).join(', ');
-  const precio = seleccionados.reduce((s, r) => s + (parseFloat(r.dataset.subtotal) || 0), 0);
+  carrito.push({
+    nombre: 'Combo personalizado',
+    productos: comboProductos.join(', '),
+    precio: Math.round(comboPrecio * 100) / 100,
+    cantidad: 1
+  });
 
-  carrito.push({ nombre: 'Combo Personalizado', productos, precio });
   persistCarrito();
   actualizarTotal();
   modalArmarCombo.classList.add('hidden');
-  Swal.fire({
-    icon: 'success',
-    title: 'Combo agregado',
-    text: 'Tu combo personalizado fue agregado al carrito.'
-  });
+  Swal.fire('✔️ Agregado', 'Tu combo personalizado fue agregado al carrito.', 'success');
 });
 
 // -----------------------------
-// EVENTOS DEL CARRITO
+// EVENTOS MODALES
 // -----------------------------
 verCarritoBtn.addEventListener('click', () => {
   renderizarCarrito();
   modalCarrito.classList.remove('hidden');
 });
 
+cerrarModalBtn.addEventListener('click', () => {
+  modalCarrito.classList.add('hidden');
+});
+
+btnCancelarCombo.addEventListener('click', () => {
+  modalArmarCombo.classList.add('hidden');
+});
+
 // -----------------------------
 // INICIO
 // -----------------------------
-cargarCombos();
+(async function init() {
+  await cargarConfig();  // primero leemos el mínimo pedido
+  await cargarCombos();
+})();
