@@ -6,6 +6,8 @@
   <title>Combos de Carnicería</title>
   <script src="script.js" defer></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body class="bg-white text-gray-900">
 
@@ -45,16 +47,18 @@
       </div>
     </div>
   </div>
+
   <!-- Modal armado de combo -->
-<div id="modal-armar-combo" class="fixed inset-0 bg-black/50 hidden z-50 flex justify-center items-center">
-  <div class="bg-white w-full max-w-lg p-6 rounded shadow-lg max-h-[90vh] overflow-y-auto">
-    <h2 class="text-xl font-bold mb-4">Armá tu combo</h2>
-    <div id="lista-productos" class="mb-4 space-y-2"></div>
-    <div class="flex justify-end mt-4">
-      <button id="cancelar-combo" class="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded mr-2">Cancelar</button>
-      <button id="agregar-combo-carrito" class="bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded">Agregar al carrito</button>
+  <div id="modal-armar-combo" class="fixed inset-0 bg-black/50 hidden z-50 flex justify-center items-center">
+    <div class="bg-white w-full max-w-lg p-6 rounded shadow-lg max-h-[90vh] overflow-y-auto">
+      <h2 class="text-xl font-bold mb-4">Armá tu combo</h2>
+      <div id="lista-productos" class="mb-4 space-y-2"></div>
+      <div class="flex justify-end mt-4">
+        <button id="cancelar-combo" class="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded mr-2">Cancelar</button>
+        <button id="agregar-combo-carrito" class="bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded">Agregar al carrito</button>
+      </div>
     </div>
   </div>
-</div>
+
 </body>
 </html>
